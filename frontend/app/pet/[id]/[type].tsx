@@ -104,7 +104,7 @@ export default function RecordList() {
           ListHeaderComponent={type === "weight" && (q.data?.length ?? 0) > 0 ? <WeightChart records={q.data ?? []} /> : undefined}
           ListEmptyComponent={<EmptyState icon={cfg.icon} title={t("list.emptyTitle")} text={t(`empty.${type}`)} />}
           renderItem={({ item, index }) => {
-            const next = type === "vaccine" ? (item.data.next_date as string | undefined) : undefined;
+            const next = type === "vaccine" || type === "parasite" ? (item.data.next_date as string | undefined) : undefined;
             const late = next ? daysUntil(next) < 0 : false;
             return (
               <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 50)}>

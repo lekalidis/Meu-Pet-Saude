@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 4 — parasite record type + medication reminder times + expenses screen + vaccine card screen + updated paywall. BACKEND: 8/8 pytest tests pass against public EXPO_PUBLIC_BACKEND_URL (test_iteration4.py). Verified: POST /pets/{id}/records with type=parasite (dewormer & antiflea) persists kind/product/next_date/cost; invalid record type rejected 422; GET /pets/{id} counts include both 'parasite' and 'grooming' keys; GET /reminders returns (a) parasite entries for future next_date with name fallback to product, (b) medication entries ONLY when data.times is set AND end_date is not past (excludes no-times and expired meds; includes times/dose/end fields), (c) vaccine next_date and (d) grooming date+remind_days; results sorted ascending by date. FRONTEND (390x844 mobile): login tutor@meupet.com/Pet12345 works. Pet dashboard renders 'Vaccine card' and 'Expenses' chips under 'Pet's health' title and shows modules including 'Dewormer & flea' (module-parasite, no premium badge) and 'Bath & grooming' (module-grooming, no premium badge). Only module-exam has premium-badge-exam. module-parasite routes to /pet/{id}/parasite (NOT paywall). Parasite list page shows existing Drontal record with 'Booster: in 91 days' badge. Expenses screen (/pet/{id}/expenses) shows This month $125.50 / This year $125.50 cards, per-category bars (Medications $80.00, Dewormer & flea $45.50), and month group 'November 2026 $125.50' with items — currency formatted as USD (web locale is English, matches context note). Vaccine card screen (/pet/{id}/vaccine-card) renders pet header, table with headers Vaccine/Given/Booster, 'No vaccines recorded yet.' empty row, footer 'Made with My Pet Health' and 'Share card' button with aria-disabled=true when no vaccines (expected). Medication form 'Reminder times' field (testID field-times): entering '25:00' blocks save and shows error 'Use times like 08:00, 20:00' under the field; replacing with '8:00 20:00' saves successfully and backend stores times='08:00, 20:00' (normalized) — verified both in the medication list toast 'Record saved!' and via GET /api/pets/{id}/records?type=medication and GET /api/reminders. Paywall (/paywall) lists exactly 4 features: Unlimited pets, PDF report for your vet, Exams with attached photos and PDFs, 'Vaccine, medication and bath reminders' — reminders feature mentioned as required. Language switch regression: PT/EN/ES/FR/DE chips still work on login screen. No deprecated expo packages detected. Only one minor UX gap found: on the parasite form, when Type (kind) is left unselected, Save is correctly blocked (URL stays on form) BUT no visible error label or '*' is shown next to the 'Type' section — because ChoicePills (used for choice/bool fields) never receives the errors[key] / required props set up in record-form.tsx. Users get no feedback why Save silently fails.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "record-form.tsx ChoicePills (parasite 'kind')", "issue": "Required 'choice' fields (kind on parasite) show no error label and no '*' when save is blocked. errors[f.key] is set to t('required') but ChoicePills has no error prop and renderField does not append ' *' for choice/bool labels (only for text Field). User can't see why Save does nothing.", "testID": "field-kind", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration4.py",
+    "/app/test_reports/pytest/pytest_iter4.xml"
+  ],
+  "action_items": [
+    "In /app/frontend/app/record-form.tsx renderField(): for f.kind === 'choice' (and 'bool' if required), pass error={errors[f.key]} to ChoicePills (adding support in the component to render an inline error below the pills) AND append ' *' to the label when f.required, so the parasite 'Type' field shows required/error state like text Fields do."
+  ],
+  "critical_code_review_comments": [
+    "server.py /api/reminders: medication branch correctly requires data.times and (not end_date or end_date >= today), and emits start/end/dose/times/date — matches spec.",
+    "server.py /api/pets/{id} counts: includes 'parasite' and 'grooming' keys; iterating the full list of 8 types is fine for small volume.",
+    "server.py RecordType literal was extended to include 'parasite' — Pydantic rejects any other string (verified: 'bogus' → 422).",
+    "records.ts PREMIUM_TYPES = ['exam'] only; parasite and grooming are FREE as per spec.",
+    "record-form.tsx: times normalization (normalizeTimes) runs on save and persists '08:00, 20:00' — verified end-to-end.",
+    "ChoicePills does not render error state — minor UX gap flagged above."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration4.py",
+    "/app/test_reports/iteration_3.json"
+  ],
+  "success_rate": {"backend": "100% (8/8 new; prior 25 iter2 + 10 iter3 still green)", "frontend": "~95% (one minor UX validation visibility issue)"},
+  "seed_data_creation": "Created and then deleted TEST_MedTimes medication record for the primary account. Parasite form was attempted; one unsuccessful submission remained on form (never persisted). Prior Drontal/Antibiótico records left in place from the primary account.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Pytest MUST run with -o addopts='' to override pytest.ini -n auto (xdist races on the shared primary account). Env vars from /app/frontend/.env must be exported (EXPO_PUBLIC_BACKEND_URL). Web locale on the preview is English so currency displays as USD (expected per spec). Parasite form choice chip testIDs are 'field-kind-dewormer' / 'field-kind-antiflea' (not 'choice-kind-*'). Date fields on web use the device locale mask — MM/DD/YYYY in English — so tests that fill 'next_date' must use that order.",
+  "rca_of_issue": "Parasite 'kind' required validation is enforced at save time (record-form.tsx line 128: `if (f.required && !tx) errs[f.key] = t('required')`) which correctly blocks submission, but renderField() only wires `error={errors[f.key]}` into the text Field branch (line 202). The choice/bool branches render ChoicePills without any error prop and without a '*' suffix on the label, so there's no visible feedback. Fix: extend ChoicePills to accept/display an error and append '*' to its label when required."
+}

@@ -48,6 +48,8 @@ function AppStack({ booted }: { booted: boolean }) {
           <Stack.Screen name="pet/[id]/index" />
           <Stack.Screen name="pet/[id]/[type]" />
           <Stack.Screen name="pet/[id]/report" />
+          <Stack.Screen name="pet/[id]/expenses" />
+          <Stack.Screen name="pet/[id]/vaccine-card" />
           <Stack.Screen name="record-form" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="paywall" />

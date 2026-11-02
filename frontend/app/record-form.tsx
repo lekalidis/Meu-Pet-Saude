@@ -8,12 +8,13 @@ import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboa
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, fileUrl, PetRecord, uploadFile } from "@/src/api";
-import { fmtNum, isoToLocal, localToIso, maskDate, maskTime, nowTime, parseNum, todayLocal, validTime } from "@/src/format";
+import { currencyCode, fmtNum, isoToLocal, normalizeTimes, localToIso, maskDate, maskTime, nowTime, parseNum, todayLocal, validTime } from "@/src/format";
 import { t } from "@/src/i18n";
 import { useLang } from "@/src/lang";
 import { PickedFile, usePhotoPicker } from "@/src/photo-picker";
 import { FieldDef, fieldLabel, RecordType, TYPE_CONFIG } from "@/src/records";
 import { syncReminders } from "@/src/reminders";
+import { useSubscription } from "@/src/revenuecat";
 import { makeStyles, useTheme } from "@/src/theme";
 import { useToast } from "@/src/toast";
 import { Button, ChoicePills, ErrorView, F, Field, Icon, Loading, ScreenHeader, Sheet } from "@/src/ui";
@@ -27,7 +28,7 @@ function initialValues(fields: FieldDef[], rec?: PetRecord): Values {
     const raw = rec?.data?.[f.key];
     if (f.kind === "bool") v[f.key] = !!raw;
     else if (f.kind === "date") v[f.key] = raw ? isoToLocal(raw) : "";
-    else if (f.kind === "number") v[f.key] = raw != null ? fmtNum(raw) : "";
+    else if (f.kind === "number" || f.kind === "money") v[f.key] = raw != null ? fmtNum(raw) : "";
     else v[f.key] = raw ?? "";
   }
   if (rec) {
@@ -68,6 +69,7 @@ function FormBody({ petId, type, record }: { petId: string; type: RecordType; re
   const { colors } = useTheme();
   const toast = useToast();
   const qc = useQueryClient();
+  const { isSubscribed } = useSubscription();
   const [values, setValues] = useState<Values>(() => initialValues(cfg.fields, record));
   const [photos, setPhotos] = useState<string[]>(record?.photos ?? []);
   const [docs, setDocs] = useState<Doc[]>(record?.docs ?? []);
@@ -109,7 +111,13 @@ function FormBody({ petId, type, record }: { petId: string; type: RecordType; re
           if (!iso) errs[f.key] = t("invalidDate", { fmt });
           else data[f.key] = iso;
         }
-      } else if (f.kind === "number") {
+      } else if (f.kind === "times") {
+        if (v) {
+          const n = normalizeTimes(v);
+          if (!n) errs[f.key] = t("invalidTimes");
+          else data[f.key] = n;
+        }
+      } else if (f.kind === "number" || f.kind === "money") {
         if (v) {
           const n = parseNum(v);
           if (n === null) errs[f.key] = t("invalidNumber");
@@ -130,7 +138,7 @@ function FormBody({ petId, type, record }: { petId: string; type: RecordType; re
       if (record) await api(`/records/${record.id}`, { method: "PUT", body });
       else await api(`/pets/${petId}/records`, { method: "POST", body });
       await qc.invalidateQueries();
-      if (type === "vaccine" || type === "grooming") syncReminders();
+      if (["vaccine", "grooming", "parasite", "medication"].includes(type)) syncReminders(isSubscribed);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       toast(record ? t("record.updated") : t("record.saved"));
       router.back();
@@ -176,8 +184,9 @@ function FormBody({ petId, type, record }: { petId: string; type: RecordType; re
       return (
         <ChoicePills
           key={f.key}
-          label={label}
+          label={label + (f.required ? " *" : "")}
           testID={tid}
+          error={errors[f.key]}
           value={values[f.key]}
           onChange={(v) => set(f.key, v)}
           options={(f.options ?? []).map((o) => ({ label: t(`opt.${o}`), value: o }))}
@@ -190,10 +199,10 @@ function FormBody({ petId, type, record }: { petId: string; type: RecordType; re
         label={label + (f.required ? " *" : "")}
         placeholder={f.kind === "date" ? t("datePh") : f.ph ? t(`${type}.${f.key}.ph`) : t("optional")}
         value={values[f.key]}
-        suffix={f.suffixKey ? t(f.suffixKey) : f.suffix}
+        suffix={f.kind === "money" ? currencyCode() : f.suffixKey ? t(f.suffixKey) : f.suffix}
         error={errors[f.key]}
         multiline={f.kind === "multiline"}
-        keyboardType={f.kind === "number" ? "decimal-pad" : f.kind === "date" ? "number-pad" : "default"}
+        keyboardType={f.kind === "number" || f.kind === "money" ? "decimal-pad" : f.kind === "date" ? "number-pad" : "default"}
         onChangeText={(tx) => set(f.key, f.kind === "date" ? maskDate(tx) : tx)}
       />
     );

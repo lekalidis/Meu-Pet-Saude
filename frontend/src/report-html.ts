@@ -1,5 +1,5 @@
 import type { Pet, PetRecord } from "@/src/api";
-import { ageText, fmtNum, isoToLocal } from "@/src/format";
+import { ageText, fmtMoney, fmtNum, isoToLocal } from "@/src/format";
 import { t } from "@/src/i18n";
 import { fieldLabel, RecordType, TYPE_CONFIG } from "@/src/records";
 
@@ -16,6 +16,7 @@ function cell(type: RecordType, r: PetRecord, key: string) {
   if (!f) return esc(v);
   if (f.kind === "date") return v ? isoToLocal(v) : "-";
   if (f.kind === "bool") return v ? t("yes") : t("no");
+  if (f.kind === "money") return v != null ? fmtMoney(Number(v)) : "-";
   if (f.kind === "number") return v != null ? `${fmtNum(v)}${f.suffix ? ` ${f.suffix}` : ""}` : "-";
   if (f.kind === "choice") return v ? esc(t(`opt.${v}`)) : "-";
   return esc(v);

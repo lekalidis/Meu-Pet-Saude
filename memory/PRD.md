@@ -33,3 +33,9 @@ Follow-up: sell internationally → app in multiple languages switchable by user
 - New free record type "Bath & grooming" (bath / grooming / both, place, remind in N days).
 - Price change requested: $4.99/month, $49.90/year (sent to RevenueCat; preview test store still showing old prices).
 - Backend tests: tests/test_iteration3.py 11/11 pass.
+
+## Iteration 4 (2026-11-02)
+- Reminders are Premium-only (free users see Premium banner). Medication reminder times (daily, 7 days ahead, until end date), dewormer/flea next dose, vaccines, baths.
+- New free type "Dewormer & flea" (parasite). Optional cost field on most records + Expenses screen (month/year totals, by category, by month; device currency).
+- Vaccine card screen (free, shareable PNG on phone, print on web) with "Made with" footer for word-of-mouth.
+- Backend tests: tests/test_iteration4.py 8/8 pass.

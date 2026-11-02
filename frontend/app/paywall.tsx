@@ -66,6 +66,7 @@ export default function Paywall() {
     { icon: "paw", text: t("pay.f1") },
     { icon: "file-pdf-box", text: t("pay.f2") },
     { icon: "file-document-multiple", text: t("pay.f3") },
+    { icon: "bell-ring", text: t("pay.f4") },
   ];
 
   return (

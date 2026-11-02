@@ -99,6 +99,16 @@ export default function PetDashboard() {
         )}
 
         <Text style={s.section}>{t("pet.healthOf", { name: pet.name })}</Text>
+        <View style={s.quickRow}>
+          <Pressable testID="open-vaccine-card-button" onPress={() => router.push(`/pet/${id}/vaccine-card`)} style={s.quickChip}>
+            <Icon name="card-account-details-star" size={20} color={colors.brandPrimary} />
+            <Text style={s.quickChipText}>{t("card.cta")}</Text>
+          </Pressable>
+          <Pressable testID="open-expenses-button" onPress={() => router.push(`/pet/${id}/expenses`)} style={s.quickChip}>
+            <Icon name="cash-multiple" size={20} color={colors.brandPrimary} />
+            <Text style={s.quickChipText}>{t("exp.cta")}</Text>
+          </Pressable>
+        </View>
         <View style={s.grid}>
           {RECORD_TYPES.map((ty, i) => {
             const cfg = TYPE_CONFIG[ty];
@@ -241,6 +251,18 @@ const useStyles = makeStyles((c) => ({
     paddingVertical: 4,
   },
   lockText: { fontFamily: F.bold, fontSize: 11, color: c.onBrandSecondary },
+  quickRow: { flexDirection: "row", gap: 8, paddingHorizontal: 16, marginBottom: 12 },
+  quickChip: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 48,
+    borderRadius: 999,
+    backgroundColor: c.brandTertiary,
+  },
+  quickChipText: { fontFamily: F.bold, fontSize: 14, color: c.onBrandTertiary },
   footer: {
     position: "absolute",
     left: 0,

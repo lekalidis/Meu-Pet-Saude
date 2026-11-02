@@ -237,12 +237,14 @@ export function ChoicePills({
   value,
   onChange,
   testID,
+  error,
 }: {
   label: string;
   options: { label: string; value: string }[];
   value: string;
   onChange: (v: string) => void;
   testID: string;
+  error?: string;
 }) {
   const s = useFieldStyles();
   const { colors } = useTheme();
@@ -277,6 +279,11 @@ export function ChoicePills({
           );
         })}
       </View>
+      {error ? (
+        <Text style={s.error} testID={`${testID}-error`}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }

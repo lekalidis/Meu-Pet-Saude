@@ -103,7 +103,7 @@ class Pet(BaseDocument, PetIn):
     created_at: str
 
 
-RecordType = Literal["vaccine", "weight", "illness", "medication", "visit", "exam", "grooming"]
+RecordType = Literal["vaccine", "weight", "illness", "medication", "visit", "exam", "grooming", "parasite"]
 
 
 class RecordIn(BaseModel):
@@ -361,11 +361,18 @@ async def reminders(authorization: Optional[str] = Header(None)):
     o = await auth_user_id(authorization)
     pets = {str(p["_id"]): p["name"] for p in await db.pets.find({"owner_id": o}).to_list(200)}
     out = []
-    async for d in db.records.find({"owner_id": o, "type": {"$in": ["vaccine", "grooming"]}}):
+    today = date.today().isoformat()
+    async for d in db.records.find({"owner_id": o, "type": {"$in": ["vaccine", "grooming", "parasite", "medication"]}}):
         if d["pet_id"] not in pets:
             continue
         data = d.get("data", {})
-        if d["type"] == "vaccine" and data.get("next_date"):
+        if d["type"] == "medication":
+            if data.get("times") and (not data.get("end_date") or data["end_date"] >= today):
+                out.append({"id": str(d["_id"]), "type": "medication", "pet_name": pets[d["pet_id"]], "name": data.get("name", ""),
+                            "dose": data.get("dose", ""), "times": data["times"], "start": d["date"][:10],
+                            "end": data.get("end_date"), "date": max(d["date"][:10], today)})
+            continue
+        if d["type"] in ("vaccine", "parasite") and data.get("next_date"):
             when = data["next_date"]
         elif d["type"] == "grooming" and data.get("remind_days"):
             try:
@@ -376,9 +383,9 @@ async def reminders(authorization: Optional[str] = Header(None)):
             continue
         if when >= date.today().isoformat():
             out.append({"id": str(d["_id"]), "type": d["type"], "pet_name": pets[d["pet_id"]],
-                        "name": data.get("name") or data.get("kind") or "", "date": when})
+                        "name": data.get("name") or data.get("product") or data.get("kind") or "", "date": when})
     out.sort(key=lambda x: x["date"])
-    return out[:60]
+    return out[:100]
 
 
 # ---- Pets ----
@@ -409,7 +416,7 @@ async def get_pet(pet_id: str, authorization: Optional[str] = Header(None)):
     o = await auth_user_id(authorization)
     p = Pet.from_mongo(await get_pet_doc(pet_id, o)).out()
     counts = {}
-    for t in ["vaccine", "weight", "illness", "medication", "visit", "exam", "grooming"]:
+    for t in ["vaccine", "weight", "illness", "medication", "visit", "exam", "grooming", "parasite"]:
         counts[t] = await db.records.count_documents({"pet_id": pet_id, "type": t})
     last_w = await db.records.find_one({"pet_id": pet_id, "type": "weight"}, sort=[("date", -1)])
     vaccines = await db.records.find({"pet_id": pet_id, "type": "vaccine"}).to_list(500)

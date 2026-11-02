@@ -3,13 +3,13 @@ import type { ThemeColors } from "@/src/theme";
 import { addDays, fmtNum, isoToLocal } from "@/src/format";
 import { t } from "@/src/i18n";
 
-export type RecordType = "vaccine" | "weight" | "illness" | "medication" | "visit" | "exam" | "grooming";
-export const RECORD_TYPES: RecordType[] = ["vaccine", "weight", "illness", "medication", "visit", "grooming", "exam"];
+export type RecordType = "vaccine" | "weight" | "illness" | "medication" | "visit" | "exam" | "grooming" | "parasite";
+export const RECORD_TYPES: RecordType[] = ["vaccine", "weight", "illness", "medication", "parasite", "visit", "grooming", "exam"];
 export const PREMIUM_TYPES: RecordType[] = ["exam"];
 
 export type FieldDef = {
   key: string;
-  kind: "text" | "multiline" | "number" | "date" | "bool" | "choice";
+  kind: "text" | "multiline" | "number" | "date" | "bool" | "choice" | "times" | "money";
   ph?: boolean; // has a translated placeholder at `${type}.${key}.ph`
   required?: boolean;
   options?: string[]; // codes, label at `opt.${code}`
@@ -41,6 +41,7 @@ export const TYPE_CONFIG: Record<RecordType, TypeConfig> = {
       { key: "next_date", kind: "date" },
       { key: "batch", kind: "text" },
       { key: "vet", kind: "text" },
+      { key: "cost", kind: "money" },
       { key: "notes", kind: "multiline", ph: true },
     ],
     title: (r) => r.data.name || t("type.vaccine"),
@@ -87,7 +88,9 @@ export const TYPE_CONFIG: Record<RecordType, TypeConfig> = {
       { key: "name", kind: "text", ph: true, required: true },
       { key: "dose", kind: "text", ph: true },
       { key: "frequency", kind: "text", ph: true },
+      { key: "times", kind: "times", ph: true },
       { key: "end_date", kind: "date" },
+      { key: "cost", kind: "money" },
       { key: "notes", kind: "multiline" },
     ],
     title: (r) => r.data.name || t("type.medication"),
@@ -101,10 +104,26 @@ export const TYPE_CONFIG: Record<RecordType, TypeConfig> = {
       { key: "reason", kind: "text", ph: true, required: true },
       { key: "clinic", kind: "text" },
       { key: "vet", kind: "text" },
+      { key: "cost", kind: "money" },
       { key: "notes", kind: "multiline", ph: true },
     ],
     title: (r) => r.data.reason || t("type.visit"),
     subtitle: (r) => join(isoToLocal(r.date), r.data.clinic, r.data.vet),
+  },
+  parasite: {
+    icon: "bug-outline",
+    tint: "success",
+    withTime: false,
+    fields: [
+      { key: "kind", kind: "choice", options: ["dewormer", "antiflea"], required: true },
+      { key: "product", kind: "text", ph: true },
+      { key: "next_date", kind: "date" },
+      { key: "cost", kind: "money" },
+      { key: "notes", kind: "multiline" },
+    ],
+    title: (r) => r.data.product || (r.data.kind ? t(`opt.${r.data.kind}`) : t("type.parasite")),
+    subtitle: (r) =>
+      join(isoToLocal(r.date), r.data.product && r.data.kind && t(`opt.${r.data.kind}`), r.data.next_date && t("sub.booster", { d: isoToLocal(r.data.next_date) })),
   },
   grooming: {
     icon: "shower-head",
@@ -114,6 +133,7 @@ export const TYPE_CONFIG: Record<RecordType, TypeConfig> = {
       { key: "kind", kind: "choice", options: ["bath", "groom", "both"] },
       { key: "place", kind: "text" },
       { key: "remind_days", kind: "number", ph: true, suffixKey: "days" },
+      { key: "cost", kind: "money" },
       { key: "notes", kind: "multiline" },
     ],
     title: (r) => (r.data.kind ? t(`opt.${r.data.kind}`) : t("type.grooming")),
@@ -128,6 +148,7 @@ export const TYPE_CONFIG: Record<RecordType, TypeConfig> = {
       { key: "kind", kind: "choice", options: ["ultrasound", "xray", "blood", "urine", "stool", "other"] },
       { key: "name", kind: "text", ph: true },
       { key: "clinic", kind: "text" },
+      { key: "cost", kind: "money" },
       { key: "notes", kind: "multiline", ph: true },
     ],
     photos: true,
@@ -137,4 +158,4 @@ export const TYPE_CONFIG: Record<RecordType, TypeConfig> = {
   },
 };
 
-export const fieldLabel = (type: RecordType, key: string) => t(`${type}.${key}`);
+export const fieldLabel = (type: RecordType, key: string) => (key === "cost" ? t("cost") : t(`${type}.${key}`));

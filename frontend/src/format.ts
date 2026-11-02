@@ -1,4 +1,6 @@
-import { dateOrder, decimalSep, t } from "@/src/i18n";
+import { getLocales } from "expo-localization";
+
+import { dateOrder, decimalSep, getLang, t } from "@/src/i18n";
 
 export const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -89,4 +91,21 @@ export function addDays(iso: string, n: number) {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   const x = new Date(y, m - 1, d + n);
   return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+}
+
+export const currencyCode = () => getLocales()[0]?.currencyCode ?? "USD";
+
+export function fmtMoney(v: number) {
+  try {
+    return new Intl.NumberFormat(getLang(), { style: "currency", currency: currencyCode() }).format(v);
+  } catch {
+    return `${currencyCode()} ${fmtNum(v.toFixed(2))}`;
+  }
+}
+
+// "8:00, 20:00" -> "08:00, 20:00"; null when invalid
+export function normalizeTimes(v: string): string | null {
+  const parts = v.split(/[,;\s]+/).filter(Boolean).map((p) => (/^\d:\d{2}$/.test(p) ? `0${p}` : p));
+  if (!parts.length || parts.some((p) => !validTime(p))) return null;
+  return [...new Set(parts)].sort().join(", ");
 }
