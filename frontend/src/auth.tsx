@@ -5,6 +5,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { Platform } from "react-native";
 
 import { api, initDevice, loadToken, saveToken, setUnauthorizedHandler, User } from "@/src/api";
+import { clearReminders } from "@/src/reminders";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -31,6 +32,7 @@ type Ctx = {
   register: (email: string, password: string, name: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  resetPassword: (email: string, code: string, password: string) => Promise<void>;
 };
 
 const AuthCtx = createContext<Ctx | null>(null);
@@ -137,10 +139,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api("/auth/logout", { method: "POST", body: {}, auth: false });
     } catch {}
+    await clearReminders();
     await clear();
   };
 
-  return <AuthCtx.Provider value={{ user, loading, login, register, loginWithGoogle, logout }}>{children}</AuthCtx.Provider>;
+  const resetPassword = async (email: string, code: string, password: string) => {
+    const r = await api<AuthResult>("/auth/reset", { method: "POST", body: { email, code, password }, auth: false });
+    await finish(r);
+  };
+
+  return (
+    <AuthCtx.Provider value={{ user, loading, login, register, loginWithGoogle, logout, resetPassword }}>{children}</AuthCtx.Provider>
+  );
 }
 
 export function useAuth() {

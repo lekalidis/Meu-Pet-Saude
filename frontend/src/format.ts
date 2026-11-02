@@ -84,3 +84,9 @@ export function parseNum(v: string): number | null {
   const n = parseFloat(v.replace(",", ".").trim());
   return isNaN(n) ? null : n;
 }
+
+export function addDays(iso: string, n: number) {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const x = new Date(y, m - 1, d + n);
+  return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+}

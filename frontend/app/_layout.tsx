@@ -54,6 +54,7 @@ function AppStack({ booted }: { booted: boolean }) {
         </Stack.Protected>
         <Stack.Protected guard={!user}>
           <Stack.Screen name="login" />
+          <Stack.Screen name="forgot-password" />
         </Stack.Protected>
       </Stack>
     </SubscriptionProvider>

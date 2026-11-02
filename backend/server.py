@@ -9,6 +9,7 @@ import os
 import base64
 import logging
 import uuid
+import secrets
 import requests
 import bcrypt
 import httpx
@@ -21,6 +22,8 @@ from datetime import datetime, timezone, date, timedelta
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+from email_service import send_email, reset_email  # noqa: E402
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -100,7 +103,7 @@ class Pet(BaseDocument, PetIn):
     created_at: str
 
 
-RecordType = Literal["vaccine", "weight", "illness", "medication", "visit", "exam"]
+RecordType = Literal["vaccine", "weight", "illness", "medication", "visit", "exam", "grooming"]
 
 
 class RecordIn(BaseModel):
@@ -298,6 +301,86 @@ async def logout(authorization: Optional[str] = Header(None)):
     return {"ok": True}
 
 
+class ForgotIn(BaseModel):
+    email: EmailStr
+    lang: str = "en"
+
+
+class ResetIn(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
+    password: str = Field(min_length=8, max_length=256)
+
+
+@api_router.post("/auth/forgot")
+async def forgot_password(body: ForgotIn):
+    """Emails a 6-digit code. Always returns ok so emails can't be probed."""
+    email = body.email.lower()
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if user:
+        recent = await db.password_resets.find_one({"email": email})
+        now = datetime.now(timezone.utc)
+        if recent:
+            sent = recent["created_at"]
+            if sent.tzinfo is None:
+                sent = sent.replace(tzinfo=timezone.utc)
+            if (now - sent).total_seconds() < 60:
+                return {"ok": True}
+        code = f"{secrets.randbelow(1000000):06d}"
+        await db.password_resets.delete_many({"email": email})
+        await db.password_resets.insert_one({"email": email, "code_hash": bcrypt.hashpw(code.encode(), bcrypt.gensalt()).decode(),
+                                             "attempts": 0, "created_at": now, "expires_at": now + timedelta(minutes=15)})
+        subject, html = reset_email(body.lang, code)
+        await send_email(to=email, subject=subject, html=html)
+    return {"ok": True}
+
+
+@api_router.post("/auth/reset")
+async def reset_password(body: ResetIn):
+    email = body.email.lower()
+    r = await db.password_resets.find_one({"email": email})
+    if not r:
+        raise HTTPException(status_code=400, detail="invalid_code")
+    exp = r["expires_at"] if r["expires_at"].tzinfo else r["expires_at"].replace(tzinfo=timezone.utc)
+    if exp < datetime.now(timezone.utc) or r["attempts"] >= 5:
+        await db.password_resets.delete_many({"email": email})
+        raise HTTPException(status_code=400, detail="code_expired")
+    if not bcrypt.checkpw(body.code.encode(), r["code_hash"].encode()):
+        await db.password_resets.update_one({"_id": r["_id"]}, {"$inc": {"attempts": 1}})
+        raise HTTPException(status_code=400, detail="invalid_code")
+    await db.password_resets.delete_many({"email": email})
+    await db.users.update_one({"email": email}, {"$set": {"password_hash": bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()},
+                                                 "$addToSet": {"auth_methods": "password"}})
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    return {"token": make_jwt(user["user_id"]), "user": public_user(user)}
+
+
+@api_router.get("/reminders")
+async def reminders(authorization: Optional[str] = Header(None)):
+    """Future reminder dates: vaccine boosters and next bath/grooming (date + remind_days)."""
+    o = await auth_user_id(authorization)
+    pets = {str(p["_id"]): p["name"] for p in await db.pets.find({"owner_id": o}).to_list(200)}
+    out = []
+    async for d in db.records.find({"owner_id": o, "type": {"$in": ["vaccine", "grooming"]}}):
+        if d["pet_id"] not in pets:
+            continue
+        data = d.get("data", {})
+        if d["type"] == "vaccine" and data.get("next_date"):
+            when = data["next_date"]
+        elif d["type"] == "grooming" and data.get("remind_days"):
+            try:
+                when = (date.fromisoformat(d["date"][:10]) + timedelta(days=int(data["remind_days"]))).isoformat()
+            except (ValueError, TypeError):
+                continue
+        else:
+            continue
+        if when >= date.today().isoformat():
+            out.append({"id": str(d["_id"]), "type": d["type"], "pet_name": pets[d["pet_id"]],
+                        "name": data.get("name") or data.get("kind") or "", "date": when})
+    out.sort(key=lambda x: x["date"])
+    return out[:60]
+
+
 # ---- Pets ----
 @api_router.get("/pets")
 async def list_pets(authorization: Optional[str] = Header(None)):
@@ -326,7 +409,7 @@ async def get_pet(pet_id: str, authorization: Optional[str] = Header(None)):
     o = await auth_user_id(authorization)
     p = Pet.from_mongo(await get_pet_doc(pet_id, o)).out()
     counts = {}
-    for t in ["vaccine", "weight", "illness", "medication", "visit", "exam"]:
+    for t in ["vaccine", "weight", "illness", "medication", "visit", "exam", "grooming"]:
         counts[t] = await db.records.count_documents({"pet_id": pet_id, "type": t})
     last_w = await db.records.find_one({"pet_id": pet_id, "type": "weight"}, sort=[("date", -1)])
     vaccines = await db.records.find({"pet_id": pet_id, "type": "vaccine"}).to_list(500)
@@ -517,6 +600,7 @@ async def startup():
     await db.user_sessions.create_index("user_id")
     await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
     await db.revoked_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await db.password_resets.create_index("expires_at", expireAfterSeconds=0)
 
 
 @app.on_event("shutdown")

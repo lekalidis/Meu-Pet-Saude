@@ -5,6 +5,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, Pet, Upcoming } from "@/src/api";
+import { ReminderBanner } from "@/src/reminder-banner";
 import { ageText, daysUntil, dueLabel, fmtNum, isoToLocal } from "@/src/format";
 import { t } from "@/src/i18n";
 import { useLang } from "@/src/lang";
@@ -70,6 +71,7 @@ export default function Home() {
         keyExtractor={(p) => p.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24, gap: 12 }}
         refreshControl={<RefreshControl refreshing={pets.isRefetching} onRefresh={refresh} tintColor={colors.brandPrimary} />}
+        ListHeaderComponent={list.length > 0 ? <ReminderBanner /> : undefined}
         ListEmptyComponent={
           <EmptyState icon="dog-side" title={t("home.emptyTitle")} text={t("home.emptyText")}>
             <Button label={t("home.addPet")} icon="paw" onPress={() => router.push("/pet-form")} testID="empty-add-pet-button" />

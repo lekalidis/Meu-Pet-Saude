@@ -8,8 +8,8 @@ Memory for interacting with user's RevenueCat account via integration proxy.
 - entitlement_lookup_key: pro
 - offering_lookup_key: default
 - Packages:
-  - $rc_monthly -> prodd216dadbf5 ($9.99 / P1M, trial: none)
-  - $rc_annual  -> prod1a316a8c05 ($79.99 / P1Y, trial: none)
+  - $rc_monthly -> prodd216dadbf5 ($4.99 / P1M requested 2026-11-02; test store still showed $9.99)
+  - $rc_annual  -> prod1a316a8c05 ($49.90 / P1Y requested 2026-11-02; test store still showed $79.99)
 - Dashboard: https://app.revenuecat.com/projects/proj607d0213
 - App identity: anonymous per-device id (secure storage key "device_id") used for Purchases.logIn (no auth in app).
 

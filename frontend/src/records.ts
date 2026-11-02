@@ -1,10 +1,10 @@
 import type { PetRecord } from "@/src/api";
 import type { ThemeColors } from "@/src/theme";
-import { fmtNum, isoToLocal } from "@/src/format";
+import { addDays, fmtNum, isoToLocal } from "@/src/format";
 import { t } from "@/src/i18n";
 
-export type RecordType = "vaccine" | "weight" | "illness" | "medication" | "visit" | "exam";
-export const RECORD_TYPES: RecordType[] = ["vaccine", "weight", "illness", "medication", "visit", "exam"];
+export type RecordType = "vaccine" | "weight" | "illness" | "medication" | "visit" | "exam" | "grooming";
+export const RECORD_TYPES: RecordType[] = ["vaccine", "weight", "illness", "medication", "visit", "grooming", "exam"];
 export const PREMIUM_TYPES: RecordType[] = ["exam"];
 
 export type FieldDef = {
@@ -14,6 +14,7 @@ export type FieldDef = {
   required?: boolean;
   options?: string[]; // codes, label at `opt.${code}`
   suffix?: string;
+  suffixKey?: string; // translated suffix
   showIf?: (v: Record<string, any>) => boolean;
 };
 
@@ -104,6 +105,20 @@ export const TYPE_CONFIG: Record<RecordType, TypeConfig> = {
     ],
     title: (r) => r.data.reason || t("type.visit"),
     subtitle: (r) => join(isoToLocal(r.date), r.data.clinic, r.data.vet),
+  },
+  grooming: {
+    icon: "shower-head",
+    tint: "brandSecondary",
+    withTime: false,
+    fields: [
+      { key: "kind", kind: "choice", options: ["bath", "groom", "both"] },
+      { key: "place", kind: "text" },
+      { key: "remind_days", kind: "number", ph: true, suffixKey: "days" },
+      { key: "notes", kind: "multiline" },
+    ],
+    title: (r) => (r.data.kind ? t(`opt.${r.data.kind}`) : t("type.grooming")),
+    subtitle: (r) =>
+      join(isoToLocal(r.date), r.data.place, r.data.remind_days && t("sub.nextBath", { d: isoToLocal(addDays(r.date, Number(r.data.remind_days))) })),
   },
   exam: {
     icon: "file-document-multiple",

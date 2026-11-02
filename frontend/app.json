@@ -42,6 +42,7 @@
       "expo-sharing",
       "@react-native-vector-icons/material-design-icons",
       "expo-localization",
+      "expo-notifications",
       [
         "expo-image-picker",
         {

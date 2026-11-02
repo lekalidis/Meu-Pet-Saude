@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="0" skipped="0" tests="1" time="0.179" timestamp="2026-11-02T20:28:38.023093+00:00" hostname="agent-env-6a6b5863-4320-4521-8290-5fb8fe4765ec"><testcase classname="" name="tests.test_iteration3" time="0.000"><error message="collection failure">backend/tests/test_iteration3.py:11: in &lt;module&gt;
+    BASE = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+&lt;frozen os&gt;:679: in __getitem__
+    ???
+E   KeyError: 'EXPO_PUBLIC_BACKEND_URL'</error></testcase></testsuite></testsuites>

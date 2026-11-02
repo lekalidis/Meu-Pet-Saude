@@ -26,3 +26,10 @@ Follow-up: sell internationally → app in multiple languages switchable by user
 ## Iteration 2 (2026-11-02)
 - Added login screen (email/password + Google), protected routes, account section + logout in Settings, auth strings in 5 languages. Backend 25/25 tests pass.
 - Backlog add: password reset by email, share a pet with a second tutor (family access).
+
+## Iteration 3 (2026-11-02)
+- Forgot password: 6-digit code by email (Emergent managed Resend, 5 languages), 15 min validity, max 5 attempts, 60s resend limit.
+- Local reminders (expo-notifications, phone app only): vaccines 7 days before + on the day at 9:00; next bath on date + chosen days. Permission asked from a home banner.
+- New free record type "Bath & grooming" (bath / grooming / both, place, remind in N days).
+- Price change requested: $4.99/month, $49.90/year (sent to RevenueCat; preview test store still showing old prices).
+- Backend tests: tests/test_iteration3.py 11/11 pass.

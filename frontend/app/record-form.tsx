@@ -13,6 +13,7 @@ import { t } from "@/src/i18n";
 import { useLang } from "@/src/lang";
 import { PickedFile, usePhotoPicker } from "@/src/photo-picker";
 import { FieldDef, fieldLabel, RecordType, TYPE_CONFIG } from "@/src/records";
+import { syncReminders } from "@/src/reminders";
 import { makeStyles, useTheme } from "@/src/theme";
 import { useToast } from "@/src/toast";
 import { Button, ChoicePills, ErrorView, F, Field, Icon, Loading, ScreenHeader, Sheet } from "@/src/ui";
@@ -129,6 +130,7 @@ function FormBody({ petId, type, record }: { petId: string; type: RecordType; re
       if (record) await api(`/records/${record.id}`, { method: "PUT", body });
       else await api(`/pets/${petId}/records`, { method: "POST", body });
       await qc.invalidateQueries();
+      if (type === "vaccine" || type === "grooming") syncReminders();
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       toast(record ? t("record.updated") : t("record.saved"));
       router.back();
@@ -188,7 +190,7 @@ function FormBody({ petId, type, record }: { petId: string; type: RecordType; re
         label={label + (f.required ? " *" : "")}
         placeholder={f.kind === "date" ? t("datePh") : f.ph ? t(`${type}.${f.key}.ph`) : t("optional")}
         value={values[f.key]}
-        suffix={f.suffix}
+        suffix={f.suffixKey ? t(f.suffixKey) : f.suffix}
         error={errors[f.key]}
         multiline={f.kind === "multiline"}
         keyboardType={f.kind === "number" ? "decimal-pad" : f.kind === "date" ? "number-pad" : "default"}

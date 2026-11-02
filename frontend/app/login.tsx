@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -15,6 +16,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function Login() {
   const { lang, setLang } = useLang();
   const { login, register, loginWithGoogle } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const s = useStyles();
   const { colors } = useTheme();
@@ -125,6 +127,11 @@ export default function Login() {
               {formError}
             </Text>
           ) : null}
+          {mode === "login" && (
+            <Pressable onPress={() => router.push("/forgot-password")} style={s.forgot} testID="forgot-password-link">
+              <Text style={s.forgotText}>{t("auth.forgot")}</Text>
+            </Pressable>
+          )}
           <Button
             label={mode === "login" ? t("auth.login") : t("auth.register")}
             icon={mode === "login" ? "login" : "account-plus"}
@@ -189,5 +196,7 @@ const useStyles = makeStyles((c) => ({
   },
   googleText: { fontFamily: F.bold, fontSize: 16, color: c.onSurface },
   toggle: { minHeight: 44, alignItems: "center", justifyContent: "center" },
+  forgot: { alignSelf: "flex-end", minHeight: 36, justifyContent: "center", marginTop: -8 },
+  forgotText: { fontFamily: F.bold, fontSize: 14, color: c.brandPrimary },
   toggleText: { fontFamily: F.bold, fontSize: 15, color: c.brandPrimary },
 }));
