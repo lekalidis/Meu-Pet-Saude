@@ -1,13 +1,24 @@
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAuth } from "@/src/auth";
 import { LANGS, t } from "@/src/i18n";
 import { useLang } from "@/src/lang";
 import { useSubscription } from "@/src/revenuecat";
 import { makeStyles, useTheme } from "@/src/theme";
 import { useToast } from "@/src/toast";
-import { Button, F, Icon, ScreenHeader, tap } from "@/src/ui";
+import { Button, F, Icon, ScreenHeader, Sheet, tap } from "@/src/ui";
+
+function PetAvatarless({ name }: { name: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center" }}>
+      <Text style={{ fontFamily: F.display, fontSize: 20, color: colors.onBrandPrimary }}>{name.slice(0, 1).toUpperCase()}</Text>
+    </View>
+  );
+}
 
 export default function Settings() {
   const { lang, setLang } = useLang();
@@ -17,6 +28,8 @@ export default function Settings() {
   const { colors } = useTheme();
   const toast = useToast();
   const { isSubscribed, restore, isRestoring } = useSubscription();
+  const { user, logout } = useAuth();
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   const onRestore = async () => {
     try {
@@ -31,6 +44,18 @@ export default function Settings() {
     <View style={s.root}>
       <ScreenHeader title={t("settings.title")} />
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 24 }]}>
+        <Text style={s.section}>{t("settings.account")}</Text>
+        <View style={s.plan} testID="account-card">
+          <PetAvatarless name={user?.name || user?.email || ""} />
+          <View style={{ flex: 1 }}>
+            {!!user?.name && <Text style={s.planText}>{user.name}</Text>}
+            <Text style={s.email} testID="account-email">
+              {user?.email}
+            </Text>
+          </View>
+        </View>
+        <Button label={t("settings.logout")} variant="danger" icon="logout" onPress={() => setConfirmLogout(true)} testID="logout-button" />
+
         <Text style={s.section}>{t("settings.plan")}</Text>
         <View style={[s.plan, isSubscribed && { backgroundColor: colors.brandSecondary }]} testID="plan-card">
           <Icon name={isSubscribed ? "crown" : "paw"} size={28} color={isSubscribed ? colors.onBrandSecondary : colors.brandPrimary} />
@@ -63,6 +88,28 @@ export default function Settings() {
         </View>
         <Text style={s.note}>{t("settings.deviceNote")}</Text>
       </ScrollView>
+      <Sheet
+        visible={confirmLogout}
+        onClose={() => setConfirmLogout(false)}
+        icon="logout"
+        title={t("settings.logoutTitle")}
+        text={t("settings.logoutText")}
+        testID="confirm-logout-sheet"
+      >
+        <View style={{ gap: 8 }}>
+          <Button
+            label={t("settings.logout")}
+            variant="danger"
+            icon="logout"
+            onPress={() => {
+              setConfirmLogout(false);
+              logout();
+            }}
+            testID="confirm-logout-button"
+          />
+          <Button label={t("cancel")} variant="ghost" onPress={() => setConfirmLogout(false)} testID="cancel-logout-button" />
+        </View>
+      </Sheet>
     </View>
   );
 }
@@ -78,4 +125,5 @@ const useStyles = makeStyles((c) => ({
   langDivider: { borderTopWidth: 1, borderTopColor: c.divider },
   langName: { fontFamily: F.bold, fontSize: 16, color: c.onSurface },
   note: { fontFamily: F.semi, fontSize: 12, color: c.muted, marginTop: 8 },
+  email: { fontFamily: F.semi, fontSize: 14, color: c.muted },
 }));

@@ -10,8 +10,12 @@ import base64
 import logging
 import uuid
 import requests
+import bcrypt
+import httpx
+import jwt
+from pymongo.errors import DuplicateKeyError
 from pathlib import Path
-from pydantic import BaseModel, Field, BeforeValidator, ConfigDict
+from pydantic import BaseModel, Field, BeforeValidator, ConfigDict, EmailStr
 from typing import Annotated, Any, Dict, List, Literal, Optional
 from datetime import datetime, timezone, date, timedelta
 
@@ -126,12 +130,6 @@ async def health():
 api_router = APIRouter(prefix="/api")
 
 
-def owner(x_device_id: Optional[str]) -> str:
-    if not x_device_id or len(x_device_id) < 16:
-        raise HTTPException(status_code=401, detail="Dispositivo não identificado")
-    return x_device_id
-
-
 def oid(v: str) -> ObjectId:
     if not ObjectId.is_valid(v):
         raise HTTPException(status_code=404, detail="Não encontrado")
@@ -150,10 +148,160 @@ async def root():
     return {"message": "Meu Pet Saúde API"}
 
 
+# ---------------- Auth (email/password JWT + Emergent Google) ----------------
+JWT_SECRET = os.environ["JWT_SECRET"]
+JWT_ISS, JWT_AUD = "meupet-api", "meupet-app"
+JWT_DAYS = 30
+EMERGENT_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
+
+
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=256)
+    name: str = ""
+    device_id: Optional[str] = None
+
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=256)
+    device_id: Optional[str] = None
+
+
+class SessionIn(BaseModel):
+    session_id: str
+    device_id: Optional[str] = None
+
+
+def public_user(u: dict) -> dict:
+    return {"id": u["user_id"], "email": u["email"], "name": u.get("name", ""),
+            "picture": u.get("picture"), "auth_methods": u.get("auth_methods", [])}
+
+
+def make_jwt(user_id: str) -> str:
+    now = datetime.now(timezone.utc)
+    return jwt.encode({"sub": user_id, "jti": uuid.uuid4().hex, "iat": now, "exp": now + timedelta(days=JWT_DAYS),
+                       "iss": JWT_ISS, "aud": JWT_AUD}, JWT_SECRET, algorithm="HS256")
+
+
+def bearer_token(authorization: Optional[str]) -> Optional[str]:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip() or None
+    return None
+
+
+async def resolve_user(token: Optional[str]) -> Optional[dict]:
+    if not token:
+        return None
+    s = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if s:
+        exp = s["expires_at"]
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < datetime.now(timezone.utc):
+            return None
+        return await db.users.find_one({"user_id": s["user_id"]}, {"_id": 0})
+    try:
+        p = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], audience=JWT_AUD, issuer=JWT_ISS)
+    except jwt.PyJWTError:
+        return None
+    if await db.revoked_tokens.find_one({"jti": p.get("jti")}):
+        return None
+    return await db.users.find_one({"user_id": p.get("sub")}, {"_id": 0})
+
+
+async def auth_user_id(authorization: Optional[str], token_q: Optional[str] = None) -> str:
+    user = await resolve_user(bearer_token(authorization) or token_q)
+    if not user:
+        raise HTTPException(status_code=401, detail="not_authenticated")
+    return user["user_id"]
+
+
+async def migrate_device_data(device_id: Optional[str], user_id: str):
+    """Move data created before login (keyed by the anonymous device id) to the account. Idempotent."""
+    if not device_id or len(device_id) < 16 or device_id.startswith("user_"):
+        return
+    for coll in (db.pets, db.records, db.files):
+        await coll.update_many({"owner_id": device_id}, {"$set": {"owner_id": user_id}})
+
+
+@api_router.post("/auth/register")
+async def register(body: RegisterIn):
+    email = body.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=409, detail="account_exists")
+    user = {"user_id": f"user_{uuid.uuid4().hex[:12]}", "email": email, "name": body.name.strip(),
+            "password_hash": bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode(),
+            "auth_methods": ["password"], "created_at": datetime.now(timezone.utc).isoformat()}
+    try:
+        await db.users.insert_one(dict(user))
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="account_exists")
+    await migrate_device_data(body.device_id, user["user_id"])
+    return {"token": make_jwt(user["user_id"]), "user": public_user(user)}
+
+
+@api_router.post("/auth/login")
+async def login(body: LoginIn):
+    user = await db.users.find_one({"email": body.email.lower()}, {"_id": 0})
+    ok = bool(user and user.get("password_hash")) and bcrypt.checkpw(body.password.encode(), user["password_hash"].encode())
+    if not ok:
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    await migrate_device_data(body.device_id, user["user_id"])
+    return {"token": make_jwt(user["user_id"]), "user": public_user(user)}
+
+
+@api_router.post("/auth/session")
+async def google_session(body: SessionIn):
+    async with httpx.AsyncClient(timeout=20) as hc:
+        r = await hc.get(EMERGENT_SESSION_URL, headers={"X-Session-ID": body.session_id})
+    if r.status_code != 200:
+        raise HTTPException(status_code=401, detail="invalid_session")
+    d = r.json()
+    email = d["email"].lower()
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if user:
+        await db.users.update_one({"user_id": user["user_id"]},
+                                  {"$addToSet": {"auth_methods": "google"},
+                                   "$set": {"picture": d.get("picture"), "name": user.get("name") or d.get("name", "")}})
+        user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    else:
+        user = {"user_id": f"user_{uuid.uuid4().hex[:12]}", "email": email, "name": d.get("name", ""),
+                "picture": d.get("picture"), "auth_methods": ["google"], "created_at": datetime.now(timezone.utc).isoformat()}
+        await db.users.insert_one(dict(user))
+    now = datetime.now(timezone.utc)
+    await db.user_sessions.insert_one({"session_token": d["session_token"], "user_id": user["user_id"],
+                                       "expires_at": now + timedelta(days=7), "created_at": now})
+    await migrate_device_data(body.device_id, user["user_id"])
+    return {"token": d["session_token"], "user": public_user(user)}
+
+
+@api_router.get("/auth/me")
+async def me(authorization: Optional[str] = Header(None)):
+    user = await resolve_user(bearer_token(authorization))
+    if not user:
+        raise HTTPException(status_code=401, detail="not_authenticated")
+    return public_user(user)
+
+
+@api_router.post("/auth/logout")
+async def logout(authorization: Optional[str] = Header(None)):
+    token = bearer_token(authorization)
+    if token:
+        res = await db.user_sessions.delete_one({"session_token": token})
+        if res.deleted_count == 0:
+            try:
+                p = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], audience=JWT_AUD, issuer=JWT_ISS)
+                await db.revoked_tokens.insert_one({"jti": p["jti"], "expires_at": datetime.fromtimestamp(p["exp"], timezone.utc)})
+            except jwt.PyJWTError:
+                pass
+    return {"ok": True}
+
+
 # ---- Pets ----
 @api_router.get("/pets")
-async def list_pets(x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def list_pets(authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     docs = await db.pets.find({"owner_id": o}).sort("created_at", 1).to_list(200)
     result = []
     for d in docs:
@@ -165,8 +313,8 @@ async def list_pets(x_device_id: Optional[str] = Header(None)):
 
 
 @api_router.post("/pets")
-async def create_pet(body: PetIn, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def create_pet(body: PetIn, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     pet = Pet(**body.model_dump(), owner_id=o, created_at=datetime.now(timezone.utc).isoformat())
     res = await db.pets.insert_one(pet.to_mongo())
     pet.id = str(res.inserted_id)
@@ -174,8 +322,8 @@ async def create_pet(body: PetIn, x_device_id: Optional[str] = Header(None)):
 
 
 @api_router.get("/pets/{pet_id}")
-async def get_pet(pet_id: str, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def get_pet(pet_id: str, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     p = Pet.from_mongo(await get_pet_doc(pet_id, o)).out()
     counts = {}
     for t in ["vaccine", "weight", "illness", "medication", "visit", "exam"]:
@@ -192,16 +340,16 @@ async def get_pet(pet_id: str, x_device_id: Optional[str] = Header(None)):
 
 
 @api_router.put("/pets/{pet_id}")
-async def update_pet(pet_id: str, body: PetIn, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def update_pet(pet_id: str, body: PetIn, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     await get_pet_doc(pet_id, o)
     await db.pets.update_one({"_id": oid(pet_id)}, {"$set": body.model_dump()})
     return Pet.from_mongo(await get_pet_doc(pet_id, o)).out()
 
 
 @api_router.delete("/pets/{pet_id}")
-async def delete_pet(pet_id: str, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def delete_pet(pet_id: str, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     await get_pet_doc(pet_id, o)
     await db.pets.delete_one({"_id": oid(pet_id)})
     await db.records.delete_many({"pet_id": pet_id})
@@ -210,8 +358,8 @@ async def delete_pet(pet_id: str, x_device_id: Optional[str] = Header(None)):
 
 # ---- Records ----
 @api_router.get("/pets/{pet_id}/records")
-async def list_records(pet_id: str, type: Optional[RecordType] = None, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def list_records(pet_id: str, type: Optional[RecordType] = None, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     await get_pet_doc(pet_id, o)
     q: dict = {"pet_id": pet_id}
     if type:
@@ -221,8 +369,8 @@ async def list_records(pet_id: str, type: Optional[RecordType] = None, x_device_
 
 
 @api_router.post("/pets/{pet_id}/records")
-async def create_record(pet_id: str, body: RecordIn, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def create_record(pet_id: str, body: RecordIn, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     await get_pet_doc(pet_id, o)
     rec = Record(**body.model_dump(), pet_id=pet_id, owner_id=o, created_at=datetime.now(timezone.utc).isoformat())
     res = await db.records.insert_one(rec.to_mongo())
@@ -231,8 +379,8 @@ async def create_record(pet_id: str, body: RecordIn, x_device_id: Optional[str] 
 
 
 @api_router.get("/records/{record_id}")
-async def get_record(record_id: str, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def get_record(record_id: str, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     doc = await db.records.find_one({"_id": oid(record_id), "owner_id": o})
     if not doc:
         raise HTTPException(status_code=404, detail="Registro não encontrado")
@@ -240,8 +388,8 @@ async def get_record(record_id: str, x_device_id: Optional[str] = Header(None)):
 
 
 @api_router.put("/records/{record_id}")
-async def update_record(record_id: str, body: RecordIn, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def update_record(record_id: str, body: RecordIn, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     res = await db.records.update_one({"_id": oid(record_id), "owner_id": o}, {"$set": body.model_dump()})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Registro não encontrado")
@@ -249,8 +397,8 @@ async def update_record(record_id: str, body: RecordIn, x_device_id: Optional[st
 
 
 @api_router.delete("/records/{record_id}")
-async def delete_record(record_id: str, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def delete_record(record_id: str, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     res = await db.records.delete_one({"_id": oid(record_id), "owner_id": o})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Registro não encontrado")
@@ -258,9 +406,9 @@ async def delete_record(record_id: str, x_device_id: Optional[str] = Header(None
 
 
 @api_router.get("/upcoming")
-async def upcoming(x_device_id: Optional[str] = Header(None)):
+async def upcoming(authorization: Optional[str] = Header(None)):
     """Vaccines with a next dose date (overdue or within 90 days) across all pets."""
-    o = owner(x_device_id)
+    o = await auth_user_id(authorization)
     pets = {str(p["_id"]): p["name"] for p in await db.pets.find({"owner_id": o}).to_list(200)}
     limit = (date.today() + timedelta(days=90)).isoformat()
     docs = await db.records.find({"owner_id": o, "type": "vaccine", "data.next_date": {"$nin": [None, ""], "$lte": limit}}).to_list(500)
@@ -276,8 +424,8 @@ async def upcoming(x_device_id: Optional[str] = Header(None)):
 
 # ---- Files ----
 @api_router.post("/upload")
-async def upload(file: UploadFile = File(...), x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def upload(file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     data = await file.read()
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="file_too_large")
@@ -306,16 +454,16 @@ async def read_file(path: str, o: str):
 
 
 @api_router.get("/files/{path:path}")
-async def download(path: str, d: Optional[str] = Query(None), x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id or d)
+async def download(path: str, t: Optional[str] = Query(None), authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization, t)
     data, ctype = await read_file(path, o)
     return Response(content=data, media_type=ctype, headers={"Cache-Control": "private, max-age=86400"})
 
 
 # ---- Report data (HTML is built on the device in the user's language) ----
 @api_router.get("/pets/{pet_id}/report-data")
-async def report_data(pet_id: str, sections: Optional[str] = None, x_device_id: Optional[str] = Header(None)):
-    o = owner(x_device_id)
+async def report_data(pet_id: str, sections: Optional[str] = None, authorization: Optional[str] = Header(None)):
+    o = await auth_user_id(authorization)
     pet = await get_pet_doc(pet_id, o)
     wanted = sections.split(",") if sections else None
     q: dict = {"pet_id": pet_id}
@@ -363,6 +511,12 @@ async def startup():
     await db.pets.create_index("owner_id")
     await db.records.create_index([("pet_id", 1), ("type", 1), ("date", -1)])
     await db.files.create_index("storage_path")
+    await db.users.create_index("email", unique=True)
+    await db.users.create_index("user_id", unique=True)
+    await db.user_sessions.create_index("session_token", unique=True)
+    await db.user_sessions.create_index("user_id")
+    await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
+    await db.revoked_tokens.create_index("expires_at", expireAfterSeconds=0)
 
 
 @app.on_event("shutdown")

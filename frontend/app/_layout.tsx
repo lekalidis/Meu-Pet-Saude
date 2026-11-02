@@ -8,12 +8,14 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { initDevice } from "@/src/api";
+import { AuthProvider, useAuth } from "@/src/auth";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 import { LangProvider, useLang } from "@/src/lang";
 import { queryClient } from "@/src/query-client";
 import { initializeRevenueCat, SubscriptionProvider } from "@/src/revenuecat";
 import { useTheme } from "@/src/theme";
 import { ToastProvider } from "@/src/toast";
+import { Loading } from "@/src/ui";
 
 // Disable logbox errors etc so that users can see the app
 // and agent works as expected.
@@ -29,8 +31,33 @@ try {
 function AppStack({ booted }: { booted: boolean }) {
   const { colors } = useTheme();
   const { ready } = useLang();
+  const { user, loading } = useAuth();
   if (!booted || !ready) return <View style={[styles.root, { backgroundColor: colors.surface }]} />;
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />;
+  if (loading)
+    return (
+      <View style={[styles.root, { backgroundColor: colors.surface }]}>
+        <Loading />
+      </View>
+    );
+  return (
+    <SubscriptionProvider userId={user?.id ?? null}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }}>
+        <Stack.Protected guard={!!user}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="pet-form" />
+          <Stack.Screen name="pet/[id]/index" />
+          <Stack.Screen name="pet/[id]/[type]" />
+          <Stack.Screen name="pet/[id]/report" />
+          <Stack.Screen name="record-form" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="paywall" />
+        </Stack.Protected>
+        <Stack.Protected guard={!user}>
+          <Stack.Screen name="login" />
+        </Stack.Protected>
+      </Stack>
+    </SubscriptionProvider>
+  );
 }
 
 export default function RootLayout() {
@@ -52,16 +79,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <SubscriptionProvider>
-            <LangProvider>
+          <LangProvider>
+            <AuthProvider>
               <KeyboardProvider>
                 <ToastProvider>
                   <StatusBar style="dark" />
                   <AppStack booted={(fontsLoaded || !!fontError) && deviceReady} />
                 </ToastProvider>
               </KeyboardProvider>
-            </LangProvider>
-          </SubscriptionProvider>
+            </AuthProvider>
+          </LangProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </GestureHandlerRootView>

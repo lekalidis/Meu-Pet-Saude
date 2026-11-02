@@ -10,7 +10,7 @@ Follow-up: sell internationally → app in multiple languages switchable by user
 
 ## Architecture
 - Backend FastAPI + MongoDB (`/app/backend/server.py`): pets, generic records (vaccine, weight, illness, medication, visit, exam) with photos + PDF docs, upcoming vaccines, upload/download via Emergent Object Storage, report-data (base64 images).
-- Identity: anonymous per-device id (secure storage) sent as `X-Device-Id`; also used as RevenueCat app user id.
+- Identity: accounts with email/password (JWT, 30 days) or Emergent Google login (session token, 7 days), sent as Bearer token. Data made before login (anonymous device id) moves to the account on first login. RevenueCat app user id = account user_id.
 - Frontend Expo Router stack: home, pet-form, pet/[id] dashboard, pet/[id]/[type] lists (+weight chart), record-form (generic), pet/[id]/report (PDF via expo-print + expo-sharing, HTML built on device in current language), settings (language + plan + restore), paywall.
 - i18n: `src/i18n.ts` (5 dictionaries), `src/lang.tsx` provider; dates localized (MM/DD/YYYY in English).
 - RevenueCat: `src/revenuecat.tsx`, entitlement `pro`, client-side gating only. See `/app/memory/revenuecat.md`.
@@ -19,7 +19,10 @@ Follow-up: sell internationally → app in multiple languages switchable by user
 - All features above; tested backend 16/16, frontend core flows, paywall offerings load from Test Store.
 
 ## Backlog
-- P1: Login/account so data survives reinstall and syncs across devices
 - P1: lb/°F units for US users
 - P1: Local reminders for vaccine boosters & medication times
 - P2: Shareable web link for the vet; vet clinic directory
+
+## Iteration 2 (2026-11-02)
+- Added login screen (email/password + Google), protected routes, account section + logout in Settings, auth strings in 5 languages. Backend 25/25 tests pass.
+- Backlog add: password reset by email, share a pet with a second tutor (family access).

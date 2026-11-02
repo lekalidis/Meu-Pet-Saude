@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 2 — JWT Bearer auth + Google (Emergent) migration verified end-to-end. Backend: 25/25 pytest tests passed against the public EXPO_PUBLIC_BACKEND_URL. Covered: /auth/register (duplicate -> 409 account_exists, weak password -> 422), /auth/login (wrong password -> 401 invalid_credentials, empty -> 422), /auth/me (200 w/ Bearer, 401 w/o), /auth/logout revokes the JWT (subsequent /auth/me -> 401), /auth/session with invalid session_id -> 401 invalid_session. All data routes (/pets, /pets/{id}, /pets/{id}/records, /records/{id}, /upcoming, /upload, /files/{path}, /pets/{id}/report-data) return 401 without Bearer and are isolated per user (second account gets 404 on first user's resources). /api/files/{path}?t=<token> works. Device migration verified via direct Mongo seeding: inserted pet with owner_id='devmigrate0000000000000000000001', registered a new user with that device_id, and GET /api/pets returned the migrated pet; re-login with same device_id is idempotent. Frontend (Expo web preview, 390x844): login screen renders with 5 language chips (PT/EN/ES/FR/DE) and title switches correctly ('My Pet Health' <-> 'Meu Pet Saúde'). Field-level validation errors show for invalid email ('Invalid email') and short password on signup ('Password must be at least 8 characters'). Wrong password shows 'Wrong email or password' under login-error. Successful login lands on 'My Pets'. Settings shows account email tutor@meupet.com and Log out button with a confirm sheet that returns to login. Sign-up toggle shows name field. Google button redirects to https://auth.emergentagent.com/oauth/?redirect=... (verified without completing). Regression on free user: added pet 'TEST_RexUI' and vaccine record 'TEST_V8' (saved successfully, 'Record saved!' toast). Paywall gating: tapping exam module and 'Report for the vet' CTA both routed to /paywall as expected; free modules (vaccine/weight/illness/medication/visit) opened normally. RevenueCat Test Store post-purchase popup remains outside Playwright scope (same as iteration 1). No deprecated expo-av/expo-barcode-scanner/expo-background-fetch usage detected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "RevenueCat test purchase completion", "issue": "Native Test Store popup is a browser overlay outside the app DOM; post-purchase premium unlock still requires manual verification.", "affected_testIDs": ["subscribe-button", "confirm-purchase-button"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional: manually click 'Test valid purchase' in RevenueCat Test Store popup and re-verify that exam module unlocks and report CTA routes to /pet/{id}/report (no code change needed — behavior unchanged from iteration 1)."
+  ],
+  "critical_code_review_comments": [
+    "server.py: JWT with jti + revocation list and TTL-indexed revoked_tokens / user_sessions collections — correct design.",
+    "resolve_user() handles both app-managed JWT (password auth) and Emergent session_token (Google) — correct.",
+    "migrate_device_data() guards against short/user_* device_ids and runs on register/login/session — idempotent, verified via direct Mongo seed.",
+    "/api/files accepts both Authorization header AND ?t=<token> query param (fileUrl() in api.ts uses the latter for <Image> rendering on web) — works.",
+    "No raw _id leaks in any response (verified in pet, record, upcoming, report-data shapes).",
+    "auth.tsx cleans ?session_id= from the URL after Google exchange and dedupes via sentSids ref — good UX.",
+    "login.tsx uses per-field errors (errors.email / errors.password passed into Field) for validation and the login-error testID only for backend errors — intentional separation.",
+    "No deprecated Expo packages detected in the referenced files."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (25/25)", "frontend": "~95% (RevenueCat native popup unverified)"},
+  "seed_data_creation": "Direct Mongo seed: pets.insert_one({owner_id:'devmigrate0000000000000000000001', name:'MIG_Rex', ...}) migrated and then cleaned up. UI-created 'TEST_RexUI' + vaccine record cleaned up via /api/pets DELETE.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend tests now use JWT Bearer with the fixed primary account tutor@meupet.com / Pet12345 (session-scoped fixture auto-registers if not present). Second user is freshly registered per session for isolation checks. Pytest must run WITHOUT xdist parallelism (-o addopts='' overrides pytest.ini -n auto) because the primary account's data mutates across tests and parallel workers race on duplicate TEST_ pets. Device migration cannot be tested purely via API (no endpoint to create pets with raw device_id as owner_id), so direct AsyncIOMotorClient on mongodb://localhost:27017 db=test_database is used. Email domain `.local` is rejected by Pydantic EmailStr — use .com for test emails.",
+  "rca_of_issue": "No app bugs found. Two test-tooling issues were encountered and fixed in-place: (1) `.local` TLD rejected by Pydantic EmailStr -> switched to `@test.com`; (2) pytest.ini sets `-n auto` which caused the primary-account fixture to race across workers -> run with `-o addopts=''` to disable xdist."
+}

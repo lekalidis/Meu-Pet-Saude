@@ -4,8 +4,6 @@ import Purchases, { LOG_LEVEL } from "react-native-purchases";
 import type { CustomerInfo, PurchasesPackage } from "react-native-purchases";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { initDevice } from "@/src/api";
-
 const REVENUECAT_TEST_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY;
 const REVENUECAT_IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY;
 const REVENUECAT_ANDROID_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;
@@ -31,29 +29,34 @@ export function initializeRevenueCat() {
   Purchases.configure({ apiKey: getRevenueCatApiKey() });
 }
 
-function useSubscriptionContext() {
+function useSubscriptionContext(userId: string | null) {
   const queryClient = useQueryClient();
   const rcIdentityRef = useRef<string | null>(null);
   const [identityError, setIdentityError] = useState<string | null>(null);
   const [identityBound, setIdentityBound] = useState(false);
 
-  // Identity: the app has no login, so the stable per-device id (also the backend owner id) is the RevenueCat user.
+  // Bind RevenueCat to the logged-in account id; log out on sign-out.
   useEffect(() => {
     if (!rcEnabled) return;
     (async () => {
       try {
-        const id = await initDevice();
-        if (rcIdentityRef.current !== id) {
-          const { customerInfo } = await Purchases.logIn(id);
-          rcIdentityRef.current = id;
+        if (userId && rcIdentityRef.current !== userId) {
+          const { customerInfo } = await Purchases.logIn(userId);
+          rcIdentityRef.current = userId;
           queryClient.setQueryData(["revenuecat", "customer-info"], customerInfo);
+          setIdentityError(null);
           setIdentityBound(true);
+        } else if (!userId && rcIdentityRef.current) {
+          await Purchases.logOut();
+          rcIdentityRef.current = null;
+          setIdentityBound(false);
+          queryClient.removeQueries({ queryKey: ["revenuecat", "customer-info"] });
         }
       } catch (e) {
         setIdentityError(String(e));
       }
     })();
-  }, [queryClient]);
+  }, [queryClient, userId]);
 
   const customerInfoQuery = useQuery({
     queryKey: ["revenuecat", "customer-info"],
@@ -111,8 +114,8 @@ function useSubscriptionContext() {
 type SubscriptionContextValue = ReturnType<typeof useSubscriptionContext>;
 const Context = createContext<SubscriptionContextValue | null>(null);
 
-export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const value = useSubscriptionContext();
+export function SubscriptionProvider({ children, userId }: { children: React.ReactNode; userId: string | null }) {
+  const value = useSubscriptionContext(userId);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
