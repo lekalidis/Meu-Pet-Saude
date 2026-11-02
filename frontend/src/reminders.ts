@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import { AndroidImportance } from "expo-notifications";
 import { Platform } from "react-native";
 
 import { api } from "@/src/api";
@@ -62,7 +63,7 @@ export async function syncReminders(isPremium: boolean) {
     }
     if ((await getPermState()) !== "granted") return;
     if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("reminders", { name: "Reminders", importance: Notifications.AndroidImportance.HIGH });
+      await Notifications.setNotificationChannelAsync("reminders", { name: "Reminders", importance: AndroidImportance.HIGH });
     }
     const list = await api<Reminder[]>("/reminders");
     await Notifications.cancelAllScheduledNotificationsAsync();
