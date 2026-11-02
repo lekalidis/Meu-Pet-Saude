@@ -1,0 +1,159 @@
+{
+  "app_name": "PetCare",
+  "personality": "4 Tactile / Playful LIGHT",
+  "personality_one_liner": "Cheerful and warm (alegre e acolhedor) pet health tracker with tactile modules, organic curves, and vibrant contrast.",
+  "color": {
+    "surface": "#FDF9F3",
+    "onSurface": "#2D2A26",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#2D2A26",
+    "surfaceTertiary": "#FFF1E8",
+    "onSurfaceTertiary": "#2D2A26",
+    "surfaceInverse": "#2D2A26",
+    "onSurfaceInverse": "#FDF9F3",
+    "brand": "#FF7F6A",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#FF7F6A",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#FFC247",
+    "onBrandSecondary": "#2D2A26",
+    "brandTertiary": "#FFEAE6",
+    "onBrandTertiary": "#FF7F6A",
+    "success": "#73D28F",
+    "onSuccess": "#FFFFFF",
+    "warning": "#FFC247",
+    "onWarning": "#2D2A26",
+    "error": "#FF6B6B",
+    "onError": "#FFFFFF",
+    "info": "#6AC1FF",
+    "onInfo": "#FFFFFF",
+    "border": "#EBE3D8",
+    "borderStrong": "#2D2A26",
+    "divider": "#EBE3D8",
+    "muted": "#7A7571"
+  },
+  "typography": {
+    "displayFontFamily": "Quicksand",
+    "textFontFamily": "Nunito",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous spacing. Use tactile, modular gaps (md/lg) instead of tight lists.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "pill": 999
+  },
+  "shadow_tier": 2,
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": false,
+    "do's": [
+      "Use solid tactile surfaces and pills"
+    ],
+    "dont's": [
+      "Avoid glassmorphism. Use solid surfaceSecondary or brandTertiary for elevation instead of blur."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-blur",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Meus Pets (Home)",
+      "purpose": "Overview of pets with their vital health stats and quick action triggers.",
+      "states": {
+        "loading": "Centered playful bouncing icon.",
+        "empty": "Illustration of a happy pet + 'Adicione seu primeiro pet' with primary CTA.",
+        "error": "Error message with a retry button."
+      },
+      "layout": "Grid of rounded pet cards at the top. Below, a timeline widget of upcoming routines (vaccines). A sticky Quick Actions floating pill (log weight, log illness, add photo) at the bottom."
+    },
+    {
+      "name": "Pet Profile / Dashboard",
+      "purpose": "Detailed view of one pet's health history.",
+      "states": {
+        "loading": "Skeleton of the dashboard.",
+        "empty": "Not applicable, must have data if it exists.",
+        "error": "Error message."
+      },
+      "layout": "Hero pet photo (real image) with a top-down gradient scrim. Large tactile modules for 'Vacinas', 'Peso', 'Sintomas' and 'Medicamentos' using 2-column grid layout with `space-between` and `brandTertiary` tinted icons."
+    },
+    {
+      "name": "Add Event Form (Sintomas / Vacinas)",
+      "purpose": "Fast logging interface for when a pet gets sick or vaccinated.",
+      "states": {
+        "loading": "Spinner on submit button.",
+        "empty": "N/A",
+        "error": "Inline validation errors."
+      },
+      "layout": "Labels above inputs. Large pill toggles for 'Apresentou febre?'. Image picker box for 'Foto das fezes'. Primary Submit CTA sticky at the bottom."
+    },
+    {
+      "name": "Relatório Veterinário",
+      "purpose": "Preview and share the pet's health history as a PDF.",
+      "states": {
+        "loading": "Generating PDF indicator.",
+        "empty": "N/A",
+        "error": "Failed to generate report message."
+      },
+      "layout": "A summary card of what will be included (vaccines, weight, recent symptoms). A large primary sticky CTA 'Compartilhar Relatório' at the bottom."
+    }
+  ],
+  "images": {
+    "hero_dog": {
+      "url": "https://images.unsplash.com/photo-1629740067905-bd3f515aa739?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwxfHxjdXRlJTIwZG9nJTIwcHVwcHklMjBwZXQlMjBwcm9maWxlfGVufDB8fHx8MTc5MzY0NDQ3NXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Cute dog profile photo"
+    },
+    "hero_cat": {
+      "url": "https://images.unsplash.com/photo-1515002246390-7bf7e8f87b54?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHxjdXRlJTIwY2F0JTIwa2l0dGVuJTIwcGV0JTIwcHJvZmlsZXxlbnwwfHx8fDE3OTM2NDQ0NzV8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Cute cat profile photo"
+    },
+    "vet_visit": {
+      "url": "https://images.unsplash.com/photo-1770836037793-95bdbf190f71?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwzfHx2ZXRlcmluYXJ5JTIwY2xpbmljJTIwYnVpbGRpbmclMjBvciUyMHZldCUyMGRvY3RvciUyMHdpdGglMjBkb2d8ZW58MHx8fHwxNzkzNjQ0NDc1fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Vet checking a dog"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the 'Alegre e acolhedor' (Cheerful & warm) style. Use the predefined coral (#FF7F6A) and sunny yellow (#FFC247) palette.",
+    "Implement chunky cards, rounded containers (radius lg and pill), and oversized tap areas. This is a tactile UI.",
+    "For the font, use Quicksand and Nunito via expo-font. If not possible, fallback to a rounded system font.",
+    "The primary action (e.g. Save, Share Report) MUST be sticky at the bottom over scrolling content, inside a KeyboardAvoidingView for forms.",
+    "Use Phosphor icons (filled). Ensure icon set is consistent.",
+    "Never use indigo, violet, purple, or any blue tones. Only the provided warm palette.",
+    "For images with text on top (like the pet profile hero), always apply the top-to-bottom gradient scrim using `expo-linear-gradient` to ensure text readability.",
+    "Avoid glassmorphism for this specific playful UI. Use solid surfaces instead.",
+    "Translate UI elements into Portuguese (Brazil) as requested."
+  ],
+  "haptics": {
+    "primary_button_press": "light",
+    "toggle_switch": "medium",
+    "tab_press": "light",
+    "add_event_success": "success"
+  }
+}
