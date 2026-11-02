@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only validation of the new Currency selector (BRL + 11 others) in Settings. All 6 scenarios from the request passed. BRL chip updates the sample to 'R$1,234.50' (en) and 'R$ 1.234,50' (pt), EUR updates immediately to '€ 1.234,50'. Record form (Dewormer & flea / parasite) 'Amount spent' field suffix correctly reads 'BRL' instead of 'USD'. Expenses screen shows totals and rows with 'R$' prefix (R$80.00). Chosen currency persists across page reload (sample still 'R$1,234.50' after reload). Language list and logout button remain visible as regression check. One unrelated observation: tapping module-parasite from the pet detail page while a sticky bottom 'Report for the vet' button is visible routes to /paywall; worked around by direct URL navigation. This looks like a tile-vs-sticky-button overlap and is NOT caused by the currency change (PREMIUM_TYPES only contains 'exam').",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "pet/[id]/index.tsx module tiles", "issue": "Tapping module-parasite from the pet detail page routes to /paywall instead of /pet/{id}/parasite. PREMIUM_TYPES only lists 'exam', so parasite should not be locked. Likely cause: the sticky 'Report for the vet' CTA at the bottom intercepts taps on module tiles that render near its area, and that button routes free users to /paywall. Direct URL navigation to /pet/{id}/parasite works correctly. Not related to the currency change but worth fixing (pre-existing).", "testID": "module-parasite", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_4.json"],
+  "action_items": [
+    "Investigate the module-parasite -> /paywall redirect: likely the sticky 'Report for the vet' button overlays module tiles at the bottom of the pet detail scrollview. Add bottom padding to the ScrollView content or move the sticky button to not overlap tiles. This is pre-existing and not caused by the currency fix."
+  ],
+  "critical_code_review_comments": [
+    "src/format.ts fmtMoney relies on Intl.NumberFormat with (lang, currency) - verified correct output across en/pt and BRL/EUR.",
+    "src/lang.tsx correctly loads saved currency from storage key 'app_currency' and defaults to deviceCurrency() when unset.",
+    "settings.tsx CURRENCIES chip list uses testID currency-{CODE}; selected style uses brandTertiary bg - visible in screenshots.",
+    "record-form.tsx uses currencyCode() as the money-kind suffix - confirmed shows 'BRL' when currency is BRL."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% for currency scenarios (6/6)"},
+  "seed_data_creation": "No seed created. Reused existing user tutor@meupet.com's 'Pet' with pre-existing medication record (R$80 Antibiótico).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Currency selector is complete and persistent. To reach the parasite record form directly, use URL /pet/{petId}/parasite because the tile tap intermittently hits the sticky 'Report for the vet' button and lands on /paywall. Currency defaults to USD on web (en-US locale). Settings testIDs: currency-list, currency-{CODE}, currency-sample. Record form money field has testID field-cost.",
+  "rca_of_issue": "N/A - feature works as designed. The paywall redirect on module-parasite is an unrelated layout issue."
+}

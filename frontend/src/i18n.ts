@@ -167,6 +167,7 @@ const pt: Dict = {
   "card.footer": "Feito com {app}",
   "card.failed": "Não foi possível compartilhar o cartão",
   "pay.f4": "Lembretes de vacina, remédio e banho",
+  "settings.currency": "Moeda",
   premium: "Premium",
 };
 
@@ -324,6 +325,7 @@ const en: Dict = {
   "card.footer": "Made with {app}",
   "card.failed": "Couldn't share the card",
   "pay.f4": "Vaccine, medication and bath reminders",
+  "settings.currency": "Currency",
   premium: "Premium",
 };
 
@@ -481,6 +483,7 @@ const es: Dict = {
   "card.footer": "Hecho con {app}",
   "card.failed": "No se pudo compartir el carné",
   "pay.f4": "Recordatorios de vacunas, medicamentos y baño",
+  "settings.currency": "Moneda",
   premium: "Premium",
 };
 
@@ -638,6 +641,7 @@ const fr: Dict = {
   "card.footer": "Créé avec {app}",
   "card.failed": "Impossible de partager le carnet",
   "pay.f4": "Rappels de vaccins, médicaments et bains",
+  "settings.currency": "Devise",
   premium: "Premium",
 };
 
@@ -795,6 +799,7 @@ const de: Dict = {
   "card.footer": "Erstellt mit {app}",
   "card.failed": "Impfpass konnte nicht geteilt werden",
   "pay.f4": "Erinnerungen für Impfungen, Medikamente und Bäder",
+  "settings.currency": "Währung",
   premium: "Premium",
 };
 

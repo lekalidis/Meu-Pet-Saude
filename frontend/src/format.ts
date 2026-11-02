@@ -93,7 +93,12 @@ export function addDays(iso: string, n: number) {
   return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
 }
 
-export const currencyCode = () => getLocales()[0]?.currencyCode ?? "USD";
+let chosenCurrency: string | null = null;
+export const setCurrencyVar = (c: string | null) => {
+  chosenCurrency = c;
+};
+export const deviceCurrency = () => getLocales()[0]?.currencyCode ?? "USD";
+export const currencyCode = () => chosenCurrency ?? deviceCurrency();
 
 export function fmtMoney(v: number) {
   try {

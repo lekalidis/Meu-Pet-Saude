@@ -39,3 +39,4 @@ Follow-up: sell internationally → app in multiple languages switchable by user
 - New free type "Dewormer & flea" (parasite). Optional cost field on most records + Expenses screen (month/year totals, by category, by month; device currency).
 - Vaccine card screen (free, shareable PNG on phone, print on web) with "Made with" footer for word-of-mouth.
 - Backend tests: tests/test_iteration4.py 8/8 pass.
+- 2026-11-02: Currency selector in Settings (12 currencies, saved on device; symbol only, no conversion).

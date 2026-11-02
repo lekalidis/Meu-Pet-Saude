@@ -4,12 +4,15 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/auth";
+import { fmtMoney } from "@/src/format";
 import { LANGS, t } from "@/src/i18n";
 import { useLang } from "@/src/lang";
 import { useSubscription } from "@/src/revenuecat";
 import { makeStyles, useTheme } from "@/src/theme";
 import { useToast } from "@/src/toast";
 import { Button, F, Icon, ScreenHeader, Sheet, tap } from "@/src/ui";
+
+const CURRENCIES = ["BRL", "USD", "EUR", "GBP", "CAD", "AUD", "MXN", "ARS", "CLP", "COP", "PEN", "CHF"];
 
 function PetAvatarless({ name }: { name: string }) {
   const { colors } = useTheme();
@@ -21,7 +24,7 @@ function PetAvatarless({ name }: { name: string }) {
 }
 
 export default function Settings() {
-  const { lang, setLang } = useLang();
+  const { lang, setLang, currency, setCurrency } = useLang();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const s = useStyles();
@@ -86,6 +89,29 @@ export default function Settings() {
             );
           })}
         </View>
+        <Text style={s.section}>{t("settings.currency")}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.curRow} testID="currency-list">
+          {CURRENCIES.map((c) => {
+            const on = c === currency;
+            return (
+              <Pressable
+                key={c}
+                testID={`currency-${c}`}
+                onPress={() => {
+                  tap();
+                  setCurrency(c);
+                }}
+                style={[s.curChip, on && s.curChipOn]}
+              >
+                <Text style={[s.curText, on && { color: colors.onBrandTertiary }]}>{c}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <Text style={s.note} testID="currency-sample">
+          {fmtMoney(1234.5)}
+        </Text>
+
         <Text style={s.note}>{t("settings.deviceNote")}</Text>
       </ScrollView>
       <Sheet
@@ -126,4 +152,19 @@ const useStyles = makeStyles((c) => ({
   langName: { fontFamily: F.bold, fontSize: 16, color: c.onSurface },
   note: { fontFamily: F.semi, fontSize: 12, color: c.muted, marginTop: 8 },
   email: { fontFamily: F.semi, fontSize: 14, color: c.muted },
+  curRow: { gap: 8, paddingVertical: 4 },
+  curChip: {
+    height: 36,
+    minWidth: 60,
+    flexShrink: 0,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: c.border,
+    backgroundColor: c.surfaceSecondary,
+  },
+  curChipOn: { borderColor: c.brandPrimary, backgroundColor: c.brandTertiary },
+  curText: { fontFamily: F.bold, fontSize: 14, color: c.onSurface },
 }));

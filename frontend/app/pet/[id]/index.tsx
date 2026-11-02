@@ -52,7 +52,7 @@ export default function PetDashboard() {
   return (
     <View style={s.root}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => void q.refetch()} tintColor={colors.brandPrimary} />}
       >
         <View style={[s.hero, { paddingTop: insets.top + 64 }]}>
